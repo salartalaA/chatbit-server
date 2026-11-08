@@ -1,7 +1,7 @@
 import type { ChatbitSocket, RoomAuthorizationResult } from "@/types/rooms";
 
 export function registerRoomHandlers(socket: ChatbitSocket) {
-  socket.on("room:join", async (roomId, callback) => {
+  socket.on("room:join", async (roomId, password, callback) => {
     try {
       const baseURL = process.env.NEXT_SERVER_URL;
 
@@ -9,13 +9,38 @@ export function registerRoomHandlers(socket: ChatbitSocket) {
         throw new Error("NEXT_SERVER_URL is not configured");
       }
 
-      const response = await fetch(`${baseURL}/api/rooms/${roomId}/authorize`, {
-        headers: {
-          cookie: socket.handshake.headers.cookie ?? "",
+      const response = await fetch(
+        `${baseURL}/api/rooms/${encodeURIComponent(roomId)}/authorize`,
+        {
+          headers: {
+            cookie: socket.handshake.headers.cookie ?? "",
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+          body: JSON.stringify({
+            password,
+          }),
         },
-      });
+      );
 
-      const result = (await response.json()) as RoomAuthorizationResult;
+      const payload: unknown = await response.json();
+
+      if (
+        typeof payload !== "object" ||
+        payload === null ||
+        Array.isArray(payload) ||
+        !("authorized" in payload) ||
+        typeof payload.authorized !== "boolean" ||
+        (payload.authorized === false &&
+          (!("code" in payload) ||
+            typeof payload.code !== "string" ||
+            !("message" in payload) ||
+            typeof payload.message !== "string"))
+      ) {
+        throw new Error("Invalid authorization response");
+      }
+
+      const result = payload as RoomAuthorizationResult;
 
       if (!result.authorized) {
         callback({

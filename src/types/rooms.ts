@@ -9,6 +9,7 @@ export interface SocketData {
 export interface ClientToServerEvents {
   "room:join": (
     roomId: string,
+    password: string,
     callback: (response: JoinRoomResponse) => void,
   ) => void;
 }
@@ -19,7 +20,9 @@ export type JoinRoomResponse =
       message: string;
       code:
         | "ROOM_NOT_FOUND"
-        | "FORBIDDEN"
+        | "ACCESS_DENIED"
+        | "INVALID_REQUEST"
+        | "UNAUTHORIZED"
         | "AUTHORIZATION_FAILED"
         | "ROOM_SWITCH_FAILED";
     }
@@ -35,7 +38,11 @@ export type RoomAuthorizationResult =
     }
   | {
       authorized: false;
-      code: "ROOM_NOT_FOUND" | "FORBIDDEN";
+      code:
+        | "ACCESS_DENIED"
+        | "ROOM_NOT_FOUND"
+        | "INVALID_REQUEST"
+        | "UNAUTHORIZED";
       message: string;
     };
 
