@@ -3,13 +3,13 @@ import type { Server as HTTPServer } from "node:http";
 
 import { activeConnections } from "@/lib/active-connections";
 import { socketAuthMiddleware } from "@/middleware/socket-auth.middleware";
-import { ClientToServerEvents, SocketData } from "@/types/rooms";
+import { ClientToServerEvents, ServerToClientEvents, SocketData } from "@/types/rooms";
 import { registerRoomHandlers } from "@/socket/handlers/room.handler";
 
 export function initializeSocket(server: HTTPServer, allowedOrigin: string) {
   const io = new Server<
     ClientToServerEvents,
-    DefaultEventsMap,
+    ServerToClientEvents,
     DefaultEventsMap,
     SocketData
   >(server, {
@@ -37,7 +37,7 @@ export function initializeSocket(server: HTTPServer, allowedOrigin: string) {
 
     console.log(`User connected: ${userId}`);
 
-    registerRoomHandlers(socket);
+    registerRoomHandlers(io, socket);
 
     socket.on("disconnect", () => {
       if (activeConnections.get(userId) === socket.id) {

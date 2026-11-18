@@ -1,9 +1,26 @@
-import type { DefaultEventsMap, Socket } from "socket.io";
+import type { DefaultEventsMap, Server, Socket } from "socket.io";
 
 export interface SocketData {
   user: {
     id: string;
   };
+}
+
+export interface SendMessagePayload {
+  roomId: string;
+  content: string;
+}
+
+export interface MessageDTO {
+  id: string;
+  content: string;
+  roomId: string;
+  sender: {
+    id: string;
+    name: string;
+    image: string | null;
+  };
+  createdAt: string;
 }
 
 export interface ClientToServerEvents {
@@ -12,6 +29,22 @@ export interface ClientToServerEvents {
     password: string,
     callback: (response: JoinRoomResponse) => void,
   ) => void;
+
+  "message:send": (
+    payload: SendMessagePayload,
+    callback: (response: SendMessageResponse) => void,
+  ) => void;
+
+  "message:history": (
+    roomId: string,
+    callback: (response: MessageHistoryResponse) => void,
+  ) => void;
+}
+
+export interface ServerToClientEvents {
+  "connection:rejected": (response: { code: "ALREADY_CONNECTED" }) => void;
+
+  "message:new": (message: MessageDTO) => void;
 }
 
 export type JoinRoomResponse =
@@ -46,9 +79,37 @@ export type RoomAuthorizationResult =
       message: string;
     };
 
+export type SendMessageResponse =
+  | {
+      success: true;
+    }
+  | {
+      success: false;
+      code: "INVALID_REQUEST" | "NOT_IN_ROOM" | "MESSAGE_FAILED";
+      message: string;
+    };
+
+export type MessageHistoryResponse =
+  | {
+      success: true;
+      messages: MessageDTO[];
+    }
+  | {
+      success: false;
+      code: "INVALID_REQUEST" | "NOT_IN_ROOM" | "HISTORY_FAILED";
+      message: string;
+    };
+
 export type ChatbitSocket = Socket<
   ClientToServerEvents,
+  ServerToClientEvents,
   DefaultEventsMap,
+  SocketData
+>;
+
+export type ChatbitServer = Server<
+  ClientToServerEvents,
+  ServerToClientEvents,
   DefaultEventsMap,
   SocketData
 >;
