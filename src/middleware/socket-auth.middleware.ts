@@ -6,6 +6,7 @@ interface AuthenticatedSession {
   };
   user: {
     id: string;
+    name: string;
   };
 }
 
@@ -29,6 +30,8 @@ function isAuthenticatedSession(value: unknown): value is AuthenticatedSession {
     user !== null &&
     "id" in user &&
     typeof user.id === "string" &&
+    "name" in user &&
+    typeof user.name === "string" &&
     session.userId === user.id
   );
 }
@@ -65,6 +68,7 @@ export async function socketAuthMiddleware(
 
     socket.data.user = {
       id: data.user.id,
+      name: data.user.name,
     };
 
     next();

@@ -2,7 +2,16 @@ import type {
   ChatbitServer,
   ChatbitSocket,
   RoomAuthorizationResult,
+  TypingUser,
 } from "@/types/rooms";
+
+const typingUsers = new Map<string, Map<string, TypingUser>>();
+
+function broadcastTypingUsers(socket: ChatbitSocket, roomId: string) {
+  const users = Array.from(typingUsers.get(roomId)?.values() ?? []);
+
+  socket.to(roomId).emit("typing:update", { users });
+}
 
 export function registerRoomHandlers(io: ChatbitServer, socket: ChatbitSocket) {
   socket.on("room:join", async (roomId, password, callback) => {
@@ -223,5 +232,40 @@ export function registerRoomHandlers(io: ChatbitServer, socket: ChatbitSocket) {
         code: "HISTORY_FAILED",
       });
     }
+  });
+
+  socket.on("typing:start", (roomId) => {
+    const { id: userId, name } = socket.data.user;
+
+    if (!socket.rooms.has(roomId)) return;
+
+    let roomUsers = typingUsers.get(roomId);
+
+    if (!roomUsers) {
+      roomUsers = new Map();
+      typingUsers.set(roomId, roomUsers);
+    }
+
+    if (roomUsers.has(userId)) return;
+
+    roomUsers.set(userId, { id: userId, name });
+
+    broadcastTypingUsers(socket, roomId);
+  });
+
+  socket.on("typing:stop", (roomId) => {
+    const { id: userId } = socket.data.user;
+
+    if (!socket.rooms.has(roomId)) return;
+
+    const roomUsers = typingUsers.get(roomId);
+
+    if (!roomUsers?.delete(userId)) return;
+
+    if (roomUsers.size === 0) {
+      typingUsers.delete(roomId);
+    }
+
+    broadcastTypingUsers(socket, roomId);
   });
 }

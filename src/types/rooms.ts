@@ -3,7 +3,13 @@ import type { DefaultEventsMap, Server, Socket } from "socket.io";
 export interface SocketData {
   user: {
     id: string;
+    name: string;
   };
+}
+
+export interface TypingUser {
+  id: string;
+  name: string;
 }
 
 export interface SendMessagePayload {
@@ -39,12 +45,17 @@ export interface ClientToServerEvents {
     roomId: string,
     callback: (response: MessageHistoryResponse) => void,
   ) => void;
+
+  "typing:start": (roomId: string) => void;
+  "typing:stop": (roomId: string) => void;
 }
 
 export interface ServerToClientEvents {
   "connection:rejected": (response: { code: "ALREADY_CONNECTED" }) => void;
 
   "message:new": (message: MessageDTO) => void;
+
+  "typing:update": (payload: { users: TypingUser[] }) => void;
 }
 
 export type JoinRoomResponse =
