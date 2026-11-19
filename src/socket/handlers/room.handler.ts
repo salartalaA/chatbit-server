@@ -324,6 +324,18 @@ export function registerRoomHandlers(io: ChatbitServer, socket: ChatbitSocket) {
     callback({ success: true });
   });
 
+  socket.on("room:expired", (roomId: string) => {
+    if (socket.data.roomId !== roomId) {
+      return;
+    }
+
+    io.to(roomId).emit("room:expired");
+    io.in(roomId).disconnectSockets(true);
+
+    roomMembers.delete(roomId);
+    typingUsers.delete(roomId);
+  });
+
   socket.on("disconnect", () => {
     const userId = socket.data.user.id;
     const roomId = socket.data.roomId;

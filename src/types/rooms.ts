@@ -58,6 +58,8 @@ export interface ClientToServerEvents {
     data: { name: string },
     callback: (response: { success: boolean; message?: string }) => void,
   ) => void;
+
+  "room:expired": (roomId: string) => void;
 }
 
 export interface ServerToClientEvents {
@@ -74,6 +76,8 @@ export interface ServerToClientEvents {
   "room:deleted": () => void;
 
   "user:name-updated": (data: { userId: string; name: string }) => void;
+
+  "room:expired": () => void;
 }
 
 export type JoinRoomResponse =
