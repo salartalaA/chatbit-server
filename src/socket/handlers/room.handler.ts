@@ -283,6 +283,20 @@ export function registerRoomHandlers(io: ChatbitServer, socket: ChatbitSocket) {
     broadcastTypingUsers(socket, roomId);
   });
 
+  socket.on("room:deleted", () => {
+    const roomId = socket.data.roomId;
+
+    if (!roomId) {
+      return;
+    }
+
+    io.to(roomId).emit("room:deleted");
+    io.in(roomId).disconnectSockets(true);
+
+    roomMembers.delete(roomId);
+    typingUsers.delete(roomId);
+  });
+
   socket.on("disconnect", () => {
     const userId = socket.data.user.id;
     const roomId = socket.data.roomId;
