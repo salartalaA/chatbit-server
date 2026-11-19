@@ -1,11 +1,15 @@
 import type {
   ChatbitServer,
   ChatbitSocket,
+  MessageDTO,
   RoomAuthorizationResult,
+  RoomMember,
   TypingUser,
 } from "@/types/rooms";
 
 const typingUsers = new Map<string, Map<string, TypingUser>>();
+
+const roomMembers = new Map<string, Map<string, RoomMember>>();
 
 function broadcastTypingUsers(socket: ChatbitSocket, roomId: string) {
   const users = Array.from(typingUsers.get(roomId)?.values() ?? []);
@@ -17,9 +21,14 @@ export function registerRoomHandlers(io: ChatbitServer, socket: ChatbitSocket) {
   socket.on("room:join", async (roomId, password, callback) => {
     try {
       const baseURL = process.env.NEXT_SERVER_URL;
+      const socketServerSecret = process.env.SOCKET_SERVER_SECRET;
 
       if (!baseURL) {
         throw new Error("NEXT_SERVER_URL is not configured");
+      }
+
+      if (!socketServerSecret) {
+        throw new Error("SOCKET_SERVER_SECRET is not configured");
       }
 
       const response = await fetch(
@@ -75,13 +84,78 @@ export function registerRoomHandlers(io: ChatbitServer, socket: ChatbitSocket) {
         return;
       }
 
+      let messages: MessageDTO[];
+
+      try {
+        const historyResponse = await fetch(
+          `${baseURL}/api/rooms/${encodeURIComponent(roomId)}/messages`,
+          {
+            headers: {
+              "x-socket-server-secret": socketServerSecret,
+            },
+          },
+        );
+
+        const historyResult = await historyResponse.json();
+
+        if (!historyResponse.ok) {
+          callback({
+            success: false,
+            code: "HISTORY_FAILED",
+            message: historyResult.error,
+          });
+
+          return;
+        }
+
+        messages = historyResult.messages;
+      } catch (error) {
+        console.error("Failed to receive previous messages:", error);
+
+        callback({
+          success: false,
+          message: "Unable to receive previous messages",
+          code: "HISTORY_FAILED",
+        });
+
+        return;
+      }
+
+      const user = socket.data.user;
+
+      const member: RoomMember = {
+        id: user.id,
+        name: user.name,
+        image: user.image,
+      };
+
       await socket.join(roomId);
+
+      if (!roomMembers.has(roomId)) {
+        roomMembers.set(roomId, new Map());
+      }
+
+      const membersMap = roomMembers.get(roomId)!;
+
+      const isNewMember = !membersMap.has(user.id);
+
+      membersMap.set(user.id, member);
+
+      socket.data.roomId = roomId;
+
+      const members = Array.from(membersMap.values());
 
       callback({
         success: true,
         message: "Joined successfully",
         roomId,
+        members,
+        messages,
       });
+
+      if (isNewMember) {
+        socket.to(roomId).emit("member:joined", member);
+      }
     } catch (error) {
       console.error("Room authorization failed:", error);
 
@@ -174,66 +248,6 @@ export function registerRoomHandlers(io: ChatbitServer, socket: ChatbitSocket) {
     }
   });
 
-  socket.on("message:history", async (roomId, callback) => {
-    try {
-      const baseURL = process.env.NEXT_SERVER_URL;
-
-      const socketServerSecret = process.env.SOCKET_SERVER_SECRET;
-
-      if (!baseURL) {
-        throw new Error("NEXT_SERVER_URL is not configured");
-      }
-
-      if (!socketServerSecret) {
-        throw new Error("SOCKET_SERVER_SECRET is not configured");
-      }
-
-      if (!socket.rooms.has(roomId)) {
-        callback({
-          success: false,
-          code: "NOT_IN_ROOM",
-          message: "You are not a member of this room",
-        });
-
-        return;
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_SERVER_URL}/api/rooms/${roomId}/messages`,
-        {
-          headers: {
-            "x-socket-server-secret": socketServerSecret,
-          },
-        },
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        callback({
-          success: false,
-          code: "INVALID_REQUEST",
-          message: result.error,
-        });
-
-        return;
-      }
-
-      callback({
-        success: true,
-        messages: result.messages,
-      });
-    } catch (error) {
-      console.error("Failed to receive previous messages:", error);
-
-      callback({
-        success: false,
-        message: "Unable to receive previous messages",
-        code: "HISTORY_FAILED",
-      });
-    }
-  });
-
   socket.on("typing:start", (roomId) => {
     const { id: userId, name } = socket.data.user;
 
@@ -267,5 +281,34 @@ export function registerRoomHandlers(io: ChatbitServer, socket: ChatbitSocket) {
     }
 
     broadcastTypingUsers(socket, roomId);
+  });
+
+  socket.on("disconnect", () => {
+    const userId = socket.data.user.id;
+    const roomId = socket.data.roomId;
+
+    if (!roomId) {
+      return;
+    }
+
+    const membersMap = roomMembers.get(roomId);
+
+    if (!membersMap) {
+      return;
+    }
+
+    const isMember = membersMap.delete(userId);
+
+    if (!isMember) {
+      return;
+    }
+
+    if (membersMap.size === 0) {
+      roomMembers.delete(roomId);
+    }
+
+    socket.to(roomId).emit("member:left", {
+      userId,
+    });
   });
 }

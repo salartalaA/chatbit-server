@@ -4,7 +4,15 @@ export interface SocketData {
   user: {
     id: string;
     name: string;
+    image: string;
   };
+  roomId?: string;
+}
+
+export interface RoomMember {
+  id: string;
+  name: string;
+  image?: string;
 }
 
 export interface TypingUser {
@@ -41,11 +49,6 @@ export interface ClientToServerEvents {
     callback: (response: SendMessageResponse) => void,
   ) => void;
 
-  "message:history": (
-    roomId: string,
-    callback: (response: MessageHistoryResponse) => void,
-  ) => void;
-
   "typing:start": (roomId: string) => void;
   "typing:stop": (roomId: string) => void;
 }
@@ -56,6 +59,10 @@ export interface ServerToClientEvents {
   "message:new": (message: MessageDTO) => void;
 
   "typing:update": (payload: { users: TypingUser[] }) => void;
+
+  "member:joined": (member: RoomMember) => void;
+
+  "member:left": (payload: { userId: string }) => void;
 }
 
 export type JoinRoomResponse =
@@ -68,12 +75,15 @@ export type JoinRoomResponse =
         | "INVALID_REQUEST"
         | "UNAUTHORIZED"
         | "AUTHORIZATION_FAILED"
-        | "ROOM_SWITCH_FAILED";
+        | "ROOM_SWITCH_FAILED"
+        | "HISTORY_FAILED";
     }
   | {
       success: true;
       message: string;
       roomId: string;
+      members: RoomMember[];
+      messages: MessageDTO[];
     };
 
 export type RoomAuthorizationResult =
@@ -97,17 +107,6 @@ export type SendMessageResponse =
   | {
       success: false;
       code: "INVALID_REQUEST" | "NOT_IN_ROOM" | "MESSAGE_FAILED";
-      message: string;
-    };
-
-export type MessageHistoryResponse =
-  | {
-      success: true;
-      messages: MessageDTO[];
-    }
-  | {
-      success: false;
-      code: "INVALID_REQUEST" | "NOT_IN_ROOM" | "HISTORY_FAILED";
       message: string;
     };
 
