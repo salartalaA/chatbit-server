@@ -297,6 +297,33 @@ export function registerRoomHandlers(io: ChatbitServer, socket: ChatbitSocket) {
     typingUsers.delete(roomId);
   });
 
+  socket.on("user:name-updated", (data, callback) => {
+    const name = data.name.trim();
+
+    if (name.length < 2 || name.length > 30) {
+      return callback({
+        success: false,
+        message: "Invalid name.",
+      });
+    }
+
+    const roomId = socket.data.roomId;
+
+    if (!roomId) {
+      return callback({
+        success: false,
+        message: "You are not in a room.",
+      });
+    }
+
+    io.to(roomId).emit("user:name-updated", {
+      userId: socket.data.user.id,
+      name,
+    });
+
+    callback({ success: true });
+  });
+
   socket.on("disconnect", () => {
     const userId = socket.data.user.id;
     const roomId = socket.data.roomId;

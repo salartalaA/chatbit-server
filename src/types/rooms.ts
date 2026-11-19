@@ -52,7 +52,12 @@ export interface ClientToServerEvents {
   "typing:start": (roomId: string) => void;
   "typing:stop": (roomId: string) => void;
 
-  "room:deleted": () => void
+  "room:deleted": () => void;
+
+  "user:name-updated": (
+    data: { name: string },
+    callback: (response: { success: boolean; message?: string }) => void,
+  ) => void;
 }
 
 export interface ServerToClientEvents {
@@ -67,6 +72,8 @@ export interface ServerToClientEvents {
   "member:left": (payload: { userId: string }) => void;
 
   "room:deleted": () => void;
+
+  "user:name-updated": (data: { userId: string; name: string }) => void;
 }
 
 export type JoinRoomResponse =
