@@ -1,3 +1,4 @@
+
 import type { DefaultEventsMap, Server, Socket } from "socket.io";
 
 export interface SocketData {
@@ -27,7 +28,7 @@ export interface SendMessagePayload {
 
 export interface MessageDTO {
   id: string;
-  content: string;
+  content: string | null;
   roomId: string;
   sender: {
     id: string;
@@ -35,6 +36,9 @@ export interface MessageDTO {
     image: string | null;
   };
   createdAt: string;
+  type: "TEXT" | "VOICE";
+  audioKey: string | null;
+  duration: number | null;
 }
 
 export interface ClientToServerEvents {
@@ -49,7 +53,10 @@ export interface ClientToServerEvents {
     callback: (response: SendMessageResponse) => void,
   ) => void;
 
+  "voice:created": (message: MessageDTO) => void;
+
   "typing:start": (roomId: string) => void;
+
   "typing:stop": (roomId: string) => void;
 
   "room:deleted": () => void;
@@ -82,48 +89,48 @@ export interface ServerToClientEvents {
 
 export type JoinRoomResponse =
   | {
-      success: false;
-      message: string;
-      code:
-        | "ROOM_NOT_FOUND"
-        | "ACCESS_DENIED"
-        | "INVALID_REQUEST"
-        | "UNAUTHORIZED"
-        | "AUTHORIZATION_FAILED"
-        | "ROOM_SWITCH_FAILED"
-        | "HISTORY_FAILED";
-    }
+    success: false;
+    message: string;
+    code:
+    | "ROOM_NOT_FOUND"
+    | "ACCESS_DENIED"
+    | "INVALID_REQUEST"
+    | "UNAUTHORIZED"
+    | "AUTHORIZATION_FAILED"
+    | "ROOM_SWITCH_FAILED"
+    | "HISTORY_FAILED";
+  }
   | {
-      success: true;
-      message: string;
-      roomId: string;
-      members: RoomMember[];
-      messages: MessageDTO[];
-    };
+    success: true;
+    message: string;
+    roomId: string;
+    members: RoomMember[];
+    messages: MessageDTO[];
+  };
 
 export type RoomAuthorizationResult =
   | {
-      authorized: true;
-    }
+    authorized: true;
+  }
   | {
-      authorized: false;
-      code:
-        | "ACCESS_DENIED"
-        | "ROOM_NOT_FOUND"
-        | "INVALID_REQUEST"
-        | "UNAUTHORIZED";
-      message: string;
-    };
+    authorized: false;
+    code:
+    | "ACCESS_DENIED"
+    | "ROOM_NOT_FOUND"
+    | "INVALID_REQUEST"
+    | "UNAUTHORIZED";
+    message: string;
+  };
 
 export type SendMessageResponse =
   | {
-      success: true;
-    }
+    success: true;
+  }
   | {
-      success: false;
-      code: "INVALID_REQUEST" | "NOT_IN_ROOM" | "MESSAGE_FAILED";
-      message: string;
-    };
+    success: false;
+    code: "INVALID_REQUEST" | "NOT_IN_ROOM" | "MESSAGE_FAILED";
+    message: string;
+  };
 
 export type ChatbitSocket = Socket<
   ClientToServerEvents,

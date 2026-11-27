@@ -1,3 +1,4 @@
+
 import type {
   ChatbitServer,
   ChatbitSocket,
@@ -15,6 +16,38 @@ function broadcastTypingUsers(socket: ChatbitSocket, roomId: string) {
   const users = Array.from(typingUsers.get(roomId)?.values() ?? []);
 
   socket.to(roomId).emit("typing:update", { users });
+}
+
+function isValidVoiceMessage(message: unknown): message is MessageDTO {
+  if (
+    typeof message !== "object" ||
+    message === null ||
+    Array.isArray(message)
+  ) {
+    return false;
+  }
+
+  const candidate = message as Partial<MessageDTO>;
+
+  return (
+    candidate.type === "VOICE" &&
+    typeof candidate.id === "string" &&
+    candidate.id.length > 0 &&
+    typeof candidate.roomId === "string" &&
+    candidate.roomId.length > 0 &&
+    typeof candidate.audioKey === "string" &&
+    candidate.audioKey.length > 0 &&
+    typeof candidate.duration === "number" &&
+    Number.isFinite(candidate.duration) &&
+    candidate.duration > 0 &&
+    typeof candidate.createdAt === "string" &&
+    typeof candidate.sender === "object" &&
+    candidate.sender !== null &&
+    typeof candidate.sender.id === "string" &&
+    typeof candidate.sender.name === "string" &&
+    (typeof candidate.sender.image === "string" ||
+      candidate.sender.image === null)
+  );
 }
 
 export function registerRoomHandlers(io: ChatbitServer, socket: ChatbitSocket) {
@@ -204,7 +237,7 @@ export function registerRoomHandlers(io: ChatbitServer, socket: ChatbitSocket) {
       }
 
       const response = await fetch(
-        `${process.env.NEXT_SERVER_URL}/api/rooms/${roomId}/messages`,
+        `${baseURL}/api/rooms/${encodeURIComponent(roomId)}/messages`,
         {
           method: "POST",
           headers: {
@@ -246,6 +279,28 @@ export function registerRoomHandlers(io: ChatbitServer, socket: ChatbitSocket) {
         code: "MESSAGE_FAILED",
       });
     }
+  });
+
+  socket.on("voice:created", (message) => {
+    if (!isValidVoiceMessage(message)) {
+      console.error("Invalid voice message payload");
+      return;
+    }
+
+    const { roomId } = message;
+    const userId = socket.data.user.id;
+
+    if (!socket.rooms.has(roomId) || socket.data.roomId !== roomId) {
+      console.warn("Voice message rejected: sender is not in the room");
+      return;
+    }
+
+    if (message.sender.id !== userId) {
+      console.warn("Voice message rejected: sender ID mismatch");
+      return;
+    }
+
+    io.to(roomId).emit("message:new", message);
   });
 
   socket.on("typing:start", (roomId) => {
